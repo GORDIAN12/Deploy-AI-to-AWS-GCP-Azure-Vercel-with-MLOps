@@ -28,7 +28,7 @@ export default function Home() {
                 >
                   Go to App
                 </Link>
-                <UserButton afterSignOutUrl="/" />
+                <UserButton />
               </div>
             </SignedIn>
           </div>
