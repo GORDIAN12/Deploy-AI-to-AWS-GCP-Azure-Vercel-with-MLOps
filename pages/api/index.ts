@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { auth } from '@clerk/nextjs/server';
+// /pages/api/index.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getAuth } from "@clerk/nextjs/server";
 
 interface Visit {
   patient_name: string;
@@ -25,68 +26,71 @@ Notes:
 ${visit.notes}`;
 }
 
-export async function POST(req: NextRequest) {
+// (Opcional) evita que Next intente transformar/comprimir respuestas streaming
+export const config = {
+  api: {
+    bodyParser: true,
+    responseLimit: false,
+  },
+};
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
   try {
-    // Autenticación con Clerk
-    const { userId } = await auth();
-    
+    // Auth Clerk (Pages Router)
+    const { userId } = getAuth(req);
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const visit: Visit = await req.json();
-    
-    // Inicializar Gemini
+    const visit = req.body as Visit;
+
+    // SSE headers
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // ayuda en proxies
+    // @ts-ignore (en algunos entornos existe)
+    res.flushHeaders?.();
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-    
-    const userPrompt = userPromptFor(visit);
-    
-    // Combinar system prompt y user prompt
-    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    
-    // Crear stream con Gemini
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+
+    const fullPrompt = `${systemPrompt}\n\n${userPromptFor(visit)}`;
     const result = await model.generateContentStream(fullPrompt);
 
-    // Crear un ReadableStream para SSE
-    const encoder = new TextEncoder();
-    const customStream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) {
-              const lines = text.split('\n');
-              for (let i = 0; i < lines.length - 1; i++) {
-                controller.enqueue(encoder.encode(`data: ${lines[i]}\n\n`));
-                controller.enqueue(encoder.encode('data:  \n'));
-              }
-              controller.enqueue(encoder.encode(`data: ${lines[lines.length - 1]}\n\n`));
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error('Stream error:', error);
-          controller.error(error);
-        }
-      },
-    });
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (!text) continue;
 
-    return new NextResponse(customStream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+      // manda línea por línea para que tu cliente lo concatene igual
+      const lines = text.split("\n");
+      for (const line of lines) {
+        res.write(`data: ${line}\n\n`);
+      }
+    }
+
+    // señal de cierre “normal”
+    res.write("event: done\ndata: [DONE]\n\n");
+    res.end();
+  } catch (err) {
+    console.error("API Error:", err);
+
+    // si ya abriste SSE, intenta mandar evento de error
+    try {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: "Internal server error" })}\n\n`);
+      res.end();
+    } catch {
+      // fallback
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
   }
 }

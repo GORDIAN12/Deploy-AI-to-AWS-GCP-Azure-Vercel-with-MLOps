@@ -25,43 +25,37 @@ function ConsultationForm() {
         e.preventDefault();
         setOutput('');
         setLoading(true);
-
-        const jwt = await getToken();
-        if (!jwt) {
-            setOutput('Authentication required');
-            setLoading(false);
-            return;
-        }
-
+      
         const controller = new AbortController();
         let buffer = '';
-
+      
         await fetchEventSource('/api', {
+            credentials: 'include',
             signal: controller.signal,
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${jwt}`,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                patient_name: patientName,
-                date_of_visit: visitDate?.toISOString().slice(0, 10),
-                notes,
+              patient_name: patientName,
+              date_of_visit: visitDate?.toISOString().slice(0, 10),
+              notes,
             }),
             onmessage(ev) {
-                buffer += ev.data;
-                setOutput(buffer);
+              buffer += ev.data + "\n"; // 👈 agrega salto para respetar líneas
+              setOutput(buffer);
             },
-            onclose() { 
-                setLoading(false); 
+            onclose() {
+              setLoading(false);
             },
             onerror(err) {
-                console.error('SSE error:', err);
-                controller.abort();
-                setLoading(false);
+              console.error('SSE error:', err);
+              controller.abort();
+              setLoading(false);
             },
-        });
-    }
+          });
+          
+        
+      }
+       
 
     return (
         <div className="container mx-auto px-4 py-12 max-w-3xl">
@@ -147,7 +141,7 @@ export default function Product() {
 
             {/* Subscription Protection */}
             <Protect
-                plan="premium_subscription"
+                plan="premium_suscripcion"
                 fallback={
                     <div className="container mx-auto px-4 py-12">
                         <header className="text-center mb-12">
