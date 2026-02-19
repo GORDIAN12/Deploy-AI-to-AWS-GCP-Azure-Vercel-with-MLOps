@@ -54,8 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no"); // ayuda en proxies
-    // @ts-ignore (en algunos entornos existe)
+    res.setHeader("X-Accel-Buffering", "no"); 
     res.flushHeaders?.();
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
