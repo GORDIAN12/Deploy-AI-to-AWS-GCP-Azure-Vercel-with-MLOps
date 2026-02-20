@@ -28,8 +28,8 @@ function ConsultationForm() {
       
         const controller = new AbortController();
         let buffer = '';
-      
-        await fetchEventSource('/api', {
+     
+        await fetchEventSource('/api/consultation', {        
             credentials: 'include',
             signal: controller.signal,
             method: 'POST',
