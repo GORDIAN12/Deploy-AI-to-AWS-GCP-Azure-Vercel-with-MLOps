@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { Protect, PricingTable, UserButton } from '@clerk/nextjs';
-
+// Form state
 function ConsultationForm() {
     const { getToken } = useAuth();
 
