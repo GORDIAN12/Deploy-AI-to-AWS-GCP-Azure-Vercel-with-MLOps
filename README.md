@@ -24,6 +24,6 @@ Agente de IA construido con la API de Google Gemini basado en el curso
 
 ##  Instalación
 ```bash
-git clone ....
+git clone git@github.com:GORDIAN12/Deploy-AI-to-AWS-GCP-Azure-Vercel-with-MLOps.git
 cd gemini-agent
 pip install -r requirements.txt
